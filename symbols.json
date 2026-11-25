@@ -1,0 +1,104 @@
+{
+  "ODC": {
+    "name": "ODC_CABINET",
+    "shape": "ODC_Triangle",
+    "color_dxf": 1,
+    "color_map": "#ef4444",
+    "keywords": [
+      "odc",
+      "cabinet",
+      "rk",
+      "feeder",
+      "oibk",
+      "aaod",
+      "24"
+    ]
+  },
+  "ODPNEW": {
+    "name": "ODP_NEW",
+    "shape": "Triangle_Solid",
+    "color_dxf": 1,
+    "color_map": "#dc2626",
+    "keywords": [
+      "odpnew",
+      "odp new",
+      "odp_new",
+      "odp plan",
+      "odp_plan"
+    ]
+  },
+  "ODP": {
+    "name": "ODP_BOX",
+    "shape": "Triangle_Hollow",
+    "color_dxf": 1,
+    "color_map": "#f97316",
+    "keywords": [
+      "odp",
+      "fat",
+      "distribution",
+      "fbv",
+      "48"
+    ]
+  },
+  "CLOSURE": {
+    "name": "JC_CLOSURE",
+    "shape": "Circle_Slash_Out",
+    "color_dxf": 4,
+    "color_map": "#06b6d4",
+    "keywords": [
+      "closure",
+      "jc",
+      "joint",
+      "splice",
+      "suntik",
+      "cl"
+    ]
+  },
+  "SLACK": {
+    "name": "SLACK_CABLE",
+    "shape": "Circle_Slash_In",
+    "color_dxf": 5,
+    "color_map": "#3b82f6",
+    "keywords": [
+      "slack",
+      "coil",
+      "cadangan",
+      "loop",
+      "bdg"
+    ]
+  },
+  "TE": {
+    "name": "TE_POLE",
+    "shape": "Circle_Cross",
+    "color_dxf": 2,
+    "color_map": "#eab308",
+    "keywords": [
+      "te",
+      "tiang listrik",
+      "pole_electric"
+    ]
+  },
+  "TN": {
+    "name": "TN_POLE",
+    "shape": "Solid_Circle",
+    "color_dxf": 1,
+    "color_map": "#ef4444",
+    "keywords": [
+      "tn",
+      "tiang telkom",
+      "pole_telecom"
+    ]
+  },
+  "OLT": {
+    "name": "OLT_STATION",
+    "shape": "Box_X",
+    "color_dxf": 6,
+    "color_map": "#d946ef",
+    "keywords": [
+      "olt",
+      "central_office",
+      "co",
+      "headend"
+    ]
+  }
+}

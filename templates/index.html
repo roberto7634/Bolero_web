@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bolero Studio — FTTx Network Architect</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    #map { height: 100%; width: 100%; z-index: 1; }
+    .leaflet-tooltip.fttx-label {
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #0f172a;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden">
+
+  <!-- TOP NAVBAR -->
+  <header class="h-13 bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <button onclick="toggleDrawer()" id="btnToggleDrawer" title="Sembunyikan / Tampilkan Panel Kerja"
+        class="w-9 h-9 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-sm transition">
+        ☰
+      </button>
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 via-slate-800 to-red-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm">
+        BS
+      </div>
+      <div>
+        <div class="text-[11px] text-slate-400 font-medium">Bolero Studio / <span class="text-blue-700 font-semibold">FTTx Network Architect</span></div>
+        <h1 class="text-sm font-bold text-slate-900 leading-tight">Bolero Studio — GIS to AutoCAD FTTx Drafter</h1>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <input id="searchInput" type="text" value="Astana Anyar, Bandung" placeholder="Cari lokasi..."
+        class="text-xs border border-slate-300 rounded-lg px-3 py-1.5 w-56 focus:outline-none focus:border-blue-600" />
+      <button onclick="searchLocation()" class="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg border border-slate-300">
+        🔍 Cari
+      </button>
+      <label class="cursor-pointer text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-lg shadow-sm">
+        📂 Import KML / KMZ
+        <input id="kmlFileInput" type="file" accept=".kml,.kmz" class="hidden" onchange="handleKmlUpload(event)" />
+      </label>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- COMPACT SLIM ICON RAIL (Menghemat ruang agar peta jauh lebih luas) -->
+    <aside class="w-14 bg-slate-900 text-slate-200 flex flex-col items-center justify-between py-3 shrink-0 z-20">
+      <div class="flex flex-col items-center gap-2 w-full px-1.5">
+        <button onclick="toggleDrawer()" title="Panel Kerja (Buka/Tutup)"
+          class="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center text-base shadow transition">
+          🗺️
+        </button>
+
+        <div class="w-7 h-[1px] bg-slate-700 my-1"></div>
+
+        <button onclick="switchBaseLayer('CAD')" id="btnLayerCAD" title="Peta Polos CAD"
+          class="w-10 h-10 rounded-xl bg-slate-800 text-blue-400 border border-blue-500/50 hover:bg-slate-700 flex items-center justify-center text-base transition">
+          📐
+        </button>
+        <button onclick="switchBaseLayer('OSM')" id="btnLayerOSM" title="Peta Jalan OSM"
+          class="w-10 h-10 rounded-xl hover:bg-slate-800 text-slate-300 flex items-center justify-center text-base transition">
+          🌐
+        </button>
+        <button onclick="switchBaseLayer('SAT')" id="btnLayerSAT" title="Citra Satelit"
+          class="w-10 h-10 rounded-xl hover:bg-slate-800 text-slate-300 flex items-center justify-center text-base transition">
+          🛰️
+        </button>
+        <button onclick="toggleLabels()" id="btnToggleLabels" title="Sembunyikan / Tampilkan Label"
+          class="w-10 h-10 rounded-xl hover:bg-slate-800 text-amber-400 flex items-center justify-center text-base transition">
+          🏷️
+        </button>
+
+        <div class="w-7 h-[1px] bg-slate-700 my-1"></div>
+
+        <button onclick="openSymbolModal()" title="Symbol Library & Aturan Layer"
+          class="w-10 h-10 rounded-xl bg-red-600 hover:bg-red-500 text-white flex items-center justify-center text-base shadow transition">
+          ⚙️
+        </button>
+      </div>
+
+      <button onclick="toggleDrawer()" title="Perluas Tampilan Peta Penuh"
+        class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold transition">
+        ⤢
+      </button>
+    </aside>
+
+    <!-- COLLAPSIBLE DRAWER PANEL -->
+    <section id="workspaceDrawer" class="w-76 bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 shadow-sm transition-all">
+      <div class="grid grid-cols-3 border-b border-slate-200 text-xs font-semibold">
+        <button id="tabBtnKonversi" onclick="switchTab('konversi')" class="py-2.5 border-b-2 border-slate-900 text-slate-900">
+          🔄 Konversi
+        </button>
+        <button id="tabBtnAnalisis" onclick="switchTab('analisis')" class="py-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+          📊 Analisis
+        </button>
+        <button id="tabBtnPanduan" onclick="switchTab('panduan')" class="py-2.5 border-b-2 border-transparent text-slate-500 hover:text-slate-800">
+          📖 Panduan
+        </button>
+      </div>
+
+      <!-- TAB 1: KONVERSI -->
+      <div id="panelKonversi" class="p-3.5 flex-1 overflow-y-auto space-y-3.5">
+        <div class="grid grid-cols-2 gap-2">
+          <select id="selectScale" onchange="updatePrintPreview()" class="text-xs font-semibold border border-slate-300 rounded-lg px-2 py-2 bg-white">
+            <option value="1:100">1:100 (Detail)</option>
+            <option value="1:250">1:250</option>
+            <option value="1:500">1:500</option>
+            <option value="1:1000" selected>1:1000 (Default)</option>
+            <option value="1:2000">1:2000 (Besar)</option>
+          </select>
+          <select id="selectTextSize" onchange="updatePrintPreview()" class="text-xs font-semibold border border-slate-300 rounded-lg px-2 py-2 bg-white">
+            <option value="Kecil">Kecil (txt)</option>
+            <option value="Normal" selected>Normal (txt)</option>
+            <option value="Besar">Besar (txt)</option>
+          </select>
+        </div>
+
+        <div class="border border-slate-200 rounded-xl p-3 bg-white shadow-sm">
+          <div class="flex justify-between items-center text-[11px] text-slate-500 mb-2">
+            <span>pratinjau cetak</span>
+            <span id="previewScaleText" class="font-mono font-bold text-slate-800">1:1000</span>
+          </div>
+
+          <div class="border border-slate-300 rounded bg-slate-50 overflow-hidden">
+            <div class="h-20 relative flex items-center justify-around px-4" style="background-image: linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px); background-size: 16px 16px;">
+              <div class="flex flex-col items-center">
+                <div class="w-0 h-0 border-l-[7px] border-l-transparent border-r-[7px] border-r-transparent border-b-[12px] border-b-red-600"></div>
+                <span id="previewLabel1" class="font-mono text-[10px] font-bold mt-1">ODPNEW</span>
+              </div>
+              <div class="flex flex-col items-center">
+                <div class="w-10 h-0.5 bg-blue-600"></div>
+                <span id="previewLabel2" class="font-mono text-[10px] mt-1">Jalan</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-12 border-t border-slate-300 bg-white font-mono text-[10px] font-bold text-slate-700 text-center">
+              <div id="previewFilenameBox" class="col-span-7 py-1 border-r border-slate-300 truncate px-1">BOLERO_STUDIO.DXF</div>
+              <div id="previewTitleScale" class="col-span-3 py-1 border-r border-slate-300">1:1000</div>
+              <div class="col-span-2 py-1">A3</div>
+            </div>
+          </div>
+
+          <label class="mt-3 flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer select-none">
+            <input type="checkbox" id="chkIncludeBoq" checked onchange="updateExportButtonLabel()" class="rounded text-blue-600 focus:ring-blue-600" />
+            <span>Sertakan Rekap BOQ (<code>.csv</code>) dalam ZIP</span>
+          </label>
+
+          <button id="btnExportDxf" onclick="exportDxf()" class="mt-2.5 w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow transition">
+            📥 Ekspor DXF + BOQ (.zip) →
+          </button>
+        </div>
+
+        <div class="border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-1.5 text-xs">
+          <div class="font-bold text-slate-700">Layer Peta Dasar OSM</div>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkJalan" checked /> Koridor Jalan (Auto-Merge)</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkBangunan" checked /> Poligon Bangunan</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkAir" checked /> Sungai / Perairan</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="chkTeks" checked /> Nama Jalan Sejajar</label>
+        </div>
+      </div>
+
+      <!-- TAB 2: ANALISIS -->
+      <div id="panelAnalisis" class="p-3.5 flex-1 overflow-y-auto space-y-3 hidden">
+        <div id="kmlFilenameLabel" class="text-[11px] text-slate-400 truncate">Belum ada berkas KML diunggah</div>
+        <h2 class="text-sm font-bold text-slate-900">Analisis Jaringan KML</h2>
+
+        <div id="statusBadge" class="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+          ℹ️ Unggah file .kml atau .kmz untuk memulai analisis otomatis.
+        </div>
+
+        <!-- PANEL PEMETAAN CEPAT TITIK KATEGORI UMUM -->
+        <div id="unrecognizedBox" class="hidden p-2.5 rounded-xl bg-amber-50 border border-amber-300 space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-900">⚠️ Titik Umum (<span id="unrecCount">0</span>)</span>
+            <button onclick="toggleUnrecList()" id="btnToggleUnrec" class="text-[11px] font-bold text-blue-700 hover:underline">
+              Sembunyikan
+            </button>
+          </div>
+          <div id="unrecListContainer" class="max-h-48 overflow-y-auto space-y-1.5 pt-1 border-t border-amber-200"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div class="p-2.5 rounded-xl border border-slate-200 bg-white">
+            <div class="text-[11px] text-slate-500">total fitur</div>
+            <div id="statTotalFitur" class="text-lg font-bold text-slate-900 mt-0.5">0</div>
+          </div>
+          <div class="p-2.5 rounded-xl border border-slate-200 bg-white">
+            <div class="text-[11px] text-slate-500">panjang kabel</div>
+            <div id="statPanjangKm" class="text-lg font-bold text-slate-900 mt-0.5">0,00 <span class="text-xs font-normal">km</span></div>
+          </div>
+        </div>
+
+        <div class="p-2.5 rounded-xl border border-slate-200 bg-white text-xs space-y-1">
+          <div class="flex justify-between text-[11px] font-bold text-slate-400 border-b border-slate-100 pb-1">
+            <span>jenis fitur</span>
+            <span>jumlah</span>
+          </div>
+          <div class="flex justify-between"><span>MANHOLE (MH)</span><span id="cntMH" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>HANDHOLE (HH/HA/HB)</span><span id="cntHH" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>CLOSURE (JC)</span><span id="cntJC" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>SLACK CABLE</span><span id="cntSlack" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>ODP / ODPNEW</span><span id="cntODP" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>ODC</span><span id="cntODC" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>TIANG (TN/TE)</span><span id="cntTiang" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>Segmen kabel / galian</span><span id="cntKabel" class="font-mono font-bold">0</span></div>
+          <div class="flex justify-between"><span>Lainnya</span><span id="cntLainnya" class="font-mono font-bold">0</span></div>
+        </div>
+
+        <div>
+          <div class="text-[11px] font-bold text-blue-700 mb-1">Daftar Titik (Klik untuk tinjau):</div>
+          <div id="pointsListContainer" class="max-h-40 overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100 bg-white text-xs">
+            <div class="p-3 text-slate-400 text-center">Belum ada data titik</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: PANDUAN -->
+      <div id="panelPanduan" class="p-3.5 flex-1 overflow-y-auto space-y-3 text-xs text-slate-600 hidden">
+        <h3 class="font-bold text-slate-900 text-sm">Alur Kerja Bolero Studio</h3>
+        <ol class="list-decimal pl-4 space-y-2">
+          <li>Klik tombol <b>☰</b> atau <b>⤢</b> untuk menyembunyikan panel agar peta tampil penuh satu layar.</li>
+          <li>Klik ikon <b>⚙️</b> di bar kiri untuk mengatur simbol AutoCAD & kata kunci KML.</li>
+          <li>Klik <b>Import KML / KMZ</b> di kanan atas untuk memuat data survei.</li>
+          <li>Atur <b>Skala Cetak</b> pada tab <b>Konversi</b> lalu ekspor file <code>.dxf</code> + rekap BOQ.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- RIGHT INTERACTIVE MAP AREA -->
+    <main class="flex-1 relative">
+      <div id="map"></div>
+
+      <!-- FLOATING MAP MODE PILL (Untuk ganti peta cepat saat panel ditutup) -->
+      <div class="absolute top-3 left-3 z-[1000] bg-white/95 backdrop-blur-xs border border-slate-300 shadow-md rounded-xl p-1 flex items-center gap-1 text-xs font-semibold">
+        <button onclick="toggleDrawer()" id="pillDrawerBtn" class="px-2.5 py-1 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition">
+          ◧ Panel Kerja
+        </button>
+        <button onclick="switchBaseLayer('CAD')" id="pillCAD" class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700">
+          CAD
+        </button>
+        <button onclick="switchBaseLayer('OSM')" id="pillOSM" class="px-2.5 py-1 rounded-lg text-slate-600 hover:bg-slate-100">
+          OSM
+        </button>
+        <button onclick="switchBaseLayer('SAT')" id="pillSAT" class="px-2.5 py-1 rounded-lg text-slate-600 hover:bg-slate-100">
+          Satelit
+        </button>
+      </div>
+
+      <div id="reviewBanner" class="hidden absolute top-14 left-3 z-[1000] bg-white border border-slate-200 shadow-lg rounded-xl px-4 py-2 flex items-center gap-4 text-xs">
+        <div>
+          <span class="text-slate-500">Meninjau </span>
+          <strong id="reviewPointName" class="text-slate-900 font-bold">-</strong>
+        </div>
+        <button onclick="clearReviewHighlight()" class="text-blue-700 font-bold hover:underline">Selesai</button>
+      </div>
+
+      <div class="absolute bottom-6 right-3 z-[1000] bg-white/95 border border-slate-300 rounded-md px-3 py-1 font-mono text-[11px] text-slate-700 shadow-sm">
+        kursor &nbsp; lat <span id="curLat">-6.93448</span> &nbsp; lon <span id="curLon">107.60202</span> &nbsp; z <span id="curZoom">16</span>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL SYMBOL LIBRARY CONFIGURATOR -->
+  <div id="symbolModal" class="hidden fixed inset-0 z-[2000] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h2 class="text-base font-bold text-slate-900">⚙️ Konfigurasi Simbol FTTx (AutoCAD DXF & KML)</h2>
+          <p class="text-xs text-slate-500">Atur bentuk simbol, nama layer CAD, warna ACI, dan kata kunci pendeteksi nama titik KML.</p>
+        </div>
+        <button onclick="closeSymbolModal()" class="text-slate-400 hover:text-slate-700 text-lg font-bold px-2">✕</button>
+      </div>
+
+      <div class="p-5 flex-1 overflow-y-auto space-y-4">
+        <div class="p-3.5 rounded-xl bg-blue-50 border border-blue-200 grid grid-cols-12 gap-2 items-end text-xs">
+          <div class="col-span-2">
+            <label class="block font-bold text-slate-700 mb-1">Kode Simbol</label>
+            <input id="newSymKey" type="text" placeholder="SPLITTER" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 uppercase font-mono bg-white" />
+          </div>
+          <div class="col-span-2">
+            <label class="block font-bold text-slate-700 mb-1">Layer CAD</label>
+            <input id="newSymLayer" type="text" placeholder="SPLITTER_BOX" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 uppercase font-mono bg-white" />
+          </div>
+          <div class="col-span-3">
+            <label class="block font-bold text-slate-700 mb-1">Bentuk Geometri</label>
+            <select id="newSymShape" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 bg-white">
+              <option value="ODC_Triangle">ODC Triangle (Segitiga Ganda + Garis)</option>
+              <option value="Triangle_Hollow">Triangle Hollow (Segitiga Kosong)</option>
+              <option value="Triangle_Solid">Triangle Solid (Segitiga Penuh)</option>
+              <option value="Circle_Slash_Out">Circle Slash Out (Lingkaran Garis Tembus)</option>
+              <option value="Circle_Slash_In">Circle Slash In (Lingkaran Garis Dalam)</option>
+              <option value="Circle_Cross">Circle Cross (Lingkaran Plus)</option>
+              <option value="Solid_Circle">Solid Circle (Lingkaran Penuh)</option>
+              <option value="Box_X">Box X (Kotak Silang)</option>
+              <option value="Diamond">Diamond (Belah Ketupat)</option>
+            </select>
+          </div>
+          <div class="col-span-2">
+            <label class="block font-bold text-slate-700 mb-1">Warna CAD (ACI)</label>
+            <select id="newSymColor" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 bg-white">
+              <option value="1">1 - Merah</option>
+              <option value="2">2 - Kuning</option>
+              <option value="3">3 - Hijau</option>
+              <option value="4">4 - Cyan</option>
+              <option value="5">5 - Biru</option>
+              <option value="6">6 - Magenta</option>
+              <option value="7" selected>7 - Putih/Hitam</option>
+            </select>
+          </div>
+          <div class="col-span-3 flex gap-1.5">
+            <div class="flex-1">
+              <label class="block font-bold text-slate-700 mb-1">Kata Kunci KML</label>
+              <input id="newSymKeywords" type="text" placeholder="splitter, spt" class="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white" />
+            </div>
+            <button onclick="addSymbolRow()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg shrink-0">
+              + Tambah
+            </button>
+          </div>
+        </div>
+
+        <div class="border border-slate-200 rounded-xl overflow-hidden">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
+              <tr>
+                <th class="py-2.5 px-3">Pratinjau</th>
+                <th class="py-2.5 px-3">Kode</th>
+                <th class="py-2.5 px-3">Layer AutoCAD</th>
+                <th class="py-2.5 px-3">Bentuk Simbol</th>
+                <th class="py-2.5 px-3">Warna ACI</th>
+                <th class="py-2.5 px-3">Kata Kunci KML (pisahkan koma)</th>
+                <th class="py-2.5 px-3 text-center">Hapus</th>
+              </tr>
+            </thead>
+            <tbody id="symbolTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <button onclick="resetSymbols()" class="text-xs font-semibold text-slate-600 hover:text-red-600 px-3 py-1.5 rounded-lg border border-slate-300 bg-white">
+          ↺ Reset ke Default
+        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="closeSymbolModal()" class="text-xs font-semibold text-slate-600 px-4 py-2 rounded-lg hover:bg-slate-200">Batal</button>
+          <button onclick="saveSymbolsToServer()" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg shadow">
+            💾 Simpan Perubahan Simbol
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const map = L.map('map', { zoomControl: false }).setView([-6.93448, 107.60202], 16);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    L.control.scale({ position: 'bottomleft', imperial: true, metric: true }).addTo(map);
+
+    const tileCad = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 20, maxNativeZoom: 16, attribution: 'ESRI Light Gray CAD'
+    });
+    const tileOsm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    });
+    const tileSat = L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+      maxZoom: 22, maxNativeZoom: 20, attribution: 'Google Satellite'
+    });
+
+    let activeTile = tileCad.addTo(map);
+    let kmlLayerGroup = L.layerGroup().addTo(map);
+    let reviewCircle = null;
+    let labelsVisible = true;
+    let drawerOpen = true;
+    let loadedKmlData = null;
+    let symbolLibraryCache = {};
+    let infraAliasesCache = { MH: ["mh", "manhole"], HH: ["hh", "handhole"], HA: ["ha"], HB: ["hb"] };
+
+    function toggleDrawer() {
+      const drawer = document.getElementById('workspaceDrawer');
+      const pillBtn = document.getElementById('pillDrawerBtn');
+      drawerOpen = !drawerOpen;
+      drawer.classList.toggle('hidden', !drawerOpen);
+      pillBtn.textContent = drawerOpen ? '◧ Tutup Panel' : '◧ Buka Panel';
+      setTimeout(() => map.invalidateSize(), 150);
+    }
+
+    const SHAPE_OPTIONS = [
+      { value: "ODC_Triangle", label: "ODC Triangle (Segitiga Ganda)" },
+      { value: "Triangle_Hollow", label: "Triangle Hollow (Segitiga Kosong)" },
+      { value: "Triangle_Solid", label: "Triangle Solid (Segitiga Penuh)" },
+      { value: "Circle_Slash_Out", label: "Circle Slash Out (Lingkaran Garis Tembus)" },
+      { value: "Circle_Slash_In", label: "Circle Slash In (Lingkaran Garis Dalam)" },
+      { value: "Circle_Cross", label: "Circle Cross (Lingkaran Plus)" },
+      { value: "Solid_Circle", label: "Solid Circle (Lingkaran Penuh)" },
+      { value: "Box_X", label: "Box X (Kotak Silang)" },
+      { value: "Diamond", label: "Diamond (Belah Ketupat)" }
+    ];
+
+    function getShapeSvg(shape, color = "#0f172a") {
+      switch (shape) {
+        case "ODC_Triangle":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="1.6">
+            <polygon points="16,3 29,27 3,27"/>
+            <polygon points="16,9 24,24 8,24"/>
+            <line x1="16" y1="3" x2="16" y2="27"/>
+            <line x1="29" y1="27" x2="9.5" y2="15"/>
+            <line x1="3" y1="27" x2="22.5" y2="15"/>
+          </svg>`;
+        case "Triangle_Hollow":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="2">
+            <polygon points="16,4 28,26 4,26"/>
+          </svg>`;
+        case "Triangle_Solid":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="${color}" stroke="${color}" stroke-width="1.5">
+            <polygon points="16,4 28,26 4,26"/>
+          </svg>`;
+        case "Circle_Slash_Out":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="2">
+            <circle cx="16" cy="16" r="9"/>
+            <line x1="4" y1="28" x2="28" y2="4"/>
+          </svg>`;
+        case "Circle_Slash_In":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="2">
+            <circle cx="16" cy="16" r="10"/>
+            <line x1="9" y1="23" x2="23" y2="9"/>
+          </svg>`;
+        case "Circle_Cross":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="2">
+            <circle cx="16" cy="16" r="9"/>
+            <line x1="4" y1="16" x2="28" y2="16"/><line x1="16" y1="4" x2="16" y2="28"/>
+          </svg>`;
+        case "Solid_Circle":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="${color}">
+            <circle cx="16" cy="16" r="10"/>
+          </svg>`;
+        case "Box_X":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="2">
+            <rect x="6" y="6" width="20" height="20"/>
+            <line x1="6" y1="6" x2="26" y2="26"/><line x1="6" y1="26" x2="26" y2="6"/>
+          </svg>`;
+        case "Diamond":
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="2">
+            <polygon points="16,4 28,16 16,28 4,16"/>
+          </svg>`;
+        default:
+          return `<svg width="28" height="28" viewBox="0 0 32 32" fill="none" stroke="${color}" stroke-width="2"><circle cx="16" cy="16" r="8"/></svg>`;
+      }
+    }
+
+    async function fetchSymbols() {
+      const res = await fetch('/api/symbols');
+      const data = await res.json();
+      symbolLibraryCache = data.symbols || data;
+      if (data.infra_aliases) infraAliasesCache = data.infra_aliases;
+    }
+    fetchSymbols();
+
+    async function openSymbolModal() {
+      await fetchSymbols();
+      renderSymbolTable();
+      document.getElementById('symbolModal').classList.remove('hidden');
+    }
+
+    function closeSymbolModal() {
+      document.getElementById('symbolModal').classList.add('hidden');
+    }
+
+    function renderSymbolTable() {
+      const tbody = document.getElementById('symbolTableBody');
+      tbody.innerHTML = '';
+      Object.entries(symbolLibraryCache).forEach(([key, cfg]) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50';
+        const shapeOpts = SHAPE_OPTIONS.map(o => `<option value="${o.value}" ${o.value === cfg.shape ? 'selected' : ''}>${o.label}</option>`).join('');
+        const colorOpts = [
+          [1, "1 - Merah"], [2, "2 - Kuning"], [3, "3 - Hijau"],
+          [4, "4 - Cyan"], [5, "5 - Biru"], [6, "6 - Magenta"], [7, "7 - Putih/Hitam"]
+        ].map(([val, lbl]) => `<option value="${val}" ${Number(cfg.color_dxf) === val ? 'selected' : ''}>${lbl}</option>`).join('');
+
+        tr.innerHTML = `
+          <td class="py-2 px-3 flex justify-center">${getShapeSvg(cfg.shape, cfg.color_map || '#0f172a')}</td>
+          <td class="py-2 px-3 font-mono font-bold text-slate-900">${key}</td>
+          <td class="py-2 px-3">
+            <input type="text" value="${cfg.name}" onchange="updateSymbolField('${key}', 'name', this.value.toUpperCase())"
+              class="border border-slate-300 rounded px-2 py-1 font-mono w-32" />
+          </td>
+          <td class="py-2 px-3">
+            <select onchange="updateSymbolField('${key}', 'shape', this.value)" class="border border-slate-300 rounded px-2 py-1 bg-white">
+              ${shapeOpts}
+            </select>
+          </td>
+          <td class="py-2 px-3">
+            <select onchange="updateSymbolField('${key}', 'color_dxf', Number(this.value))" class="border border-slate-300 rounded px-2 py-1 bg-white">
+              ${colorOpts}
+            </select>
+          </td>
+          <td class="py-2 px-3">
+            <input type="text" value="${(cfg.keywords || []).join(', ')}" onchange="updateSymbolKeywords('${key}', this.value)"
+              class="border border-slate-300 rounded px-2 py-1 w-full" />
+          </td>
+          <td class="py-2 px-3 text-center">
+            <button onclick="deleteSymbolRow('${key}')" class="text-red-500 hover:text-red-700 font-bold px-2 py-1">🗑️</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateSymbolField(key, field, value) {
+      if (symbolLibraryCache[key]) {
+        symbolLibraryCache[key][field] = value;
+        renderSymbolTable();
+      }
+    }
+
+    function updateSymbolKeywords(key, rawStr) {
+      if (symbolLibraryCache[key]) {
+        symbolLibraryCache[key].keywords = rawStr.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      }
+    }
+
+    function addSymbolRow() {
+      const key = document.getElementById('newSymKey').value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
+      const layer = document.getElementById('newSymLayer').value.trim().toUpperCase().replace(/[^A-Z0-9_]/g, '') || `${key}_LAYER`;
+      const shape = document.getElementById('newSymShape').value;
+      const colorDxf = Number(document.getElementById('newSymColor').value);
+      const kwRaw = document.getElementById('newSymKeywords').value;
+      const keywords = kwRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+      if (!key) {
+        alert('Isi Kode Simbol terlebih dahulu (misalnya: SPLITTER).');
+        return;
+      }
+      const aciHex = { 1: '#ef4444', 2: '#eab308', 3: '#22c55e', 4: '#06b6d4', 5: '#3b82f6', 6: '#d946ef', 7: '#0f172a' };
+      symbolLibraryCache[key] = {
+        name: layer,
+        shape: shape,
+        color_dxf: colorDxf,
+        color_map: aciHex[colorDxf] || '#0f172a',
+        keywords: keywords.length ? keywords : [key.toLowerCase()]
+      };
+
+      document.getElementById('newSymKey').value = '';
+      document.getElementById('newSymLayer').value = '';
+      document.getElementById('newSymKeywords').value = '';
+      renderSymbolTable();
+    }
+
+    function deleteSymbolRow(key) {
+      delete symbolLibraryCache[key];
+      renderSymbolTable();
+    }
+
+    async function resetSymbols() {
+      if (!confirm('Kembalikan daftar simbol ke pengaturan standar awal?')) return;
+      const res = await fetch('/api/symbols/reset', { method: 'POST' });
+      const data = await res.json();
+      symbolLibraryCache = data.symbols;
+      infraAliasesCache = data.infra_aliases;
+      renderSymbolTable();
+      if (loadedKmlData) reclassifyLoadedKml();
+    }
+
+    async function saveSymbolsToServer() {
+      try {
+        const res = await fetch('/api/symbols', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(symbolLibraryCache)
+        });
+        if (!res.ok) throw new Error('Gagal menyimpan simbol');
+        closeSymbolModal();
+        if (loadedKmlData) reclassifyLoadedKml();
+        alert('✅ Konfigurasi simbol berhasil disimpan!');
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    function toggleUnrecList() {
+      const box = document.getElementById('unrecListContainer');
+      const btn = document.getElementById('btnToggleUnrec');
+      const isHidden = box.classList.toggle('hidden');
+      btn.textContent = isHidden ? 'Tampilkan Daftar' : 'Sembunyikan';
+    }
+
+    function extractSuggestedKeyword(pointName) {
+      const cleaned = pointName.replace(/[0-9\-_().]/g, ' ').trim().toLowerCase();
+      const words = cleaned.split(/\s+/).filter(Boolean);
+      return words.length > 0 ? words.slice(0, 2).join(' ') : pointName.trim().toLowerCase();
+    }
+
+    function renderUnrecognizedPoints(data) {
+      const unrecPoints = data.points.filter(pt => pt.type === 'DEFAULT');
+      const box = document.getElementById('unrecognizedBox');
+      const list = document.getElementById('unrecListContainer');
+
+      if (unrecPoints.length === 0) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      box.classList.remove('hidden');
+      document.getElementById('unrecCount').textContent = unrecPoints.length;
+      list.innerHTML = '';
+
+      const allTargets = [...Object.keys(symbolLibraryCache), 'MH', 'HH', 'HA', 'HB'];
+      const optionsHtml = allTargets.map(k => `<option value="${k}">${k}</option>`).join('');
+
+      unrecPoints.forEach((pt, idx) => {
+        const suggestedKw = extractSuggestedKeyword(pt.name);
+        const row = document.createElement('div');
+        row.className = 'p-2 rounded-lg bg-white border border-amber-200 space-y-1.5';
+        row.innerHTML = `
+          <div class="flex items-center justify-between gap-1">
+            <button type="button" class="btn-loc font-mono font-bold text-slate-800 hover:text-blue-700 truncate text-left" title="Klik untuk sorot titik di peta">
+              📍 ${pt.name}
+            </button>
+          </div>
+          <div class="flex items-center gap-1">
+            <input id="kwInput_${idx}" type="text" value="${suggestedKw}" title="Kata kunci yang akan disimpan"
+              class="w-20 text-[11px] font-mono border border-slate-300 rounded px-1.5 py-1 bg-slate-50" />
+            <select id="symSelect_${idx}" class="flex-1 text-[11px] font-bold border border-slate-300 rounded px-1 py-1 bg-white">
+              ${optionsHtml}
+            </select>
+            <button onclick="assignKeywordToSymbol(${idx})" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] px-2 py-1 rounded shrink-0">
+              Simpan
+            </button>
+          </div>
+        `;
+        row.querySelector('.btn-loc').onclick = () => highlightPoint(pt);
+        list.appendChild(row);
+      });
+    }
+
+    async function assignKeywordToSymbol(idx) {
+      const kw = document.getElementById(`kwInput_${idx}`).value.trim().toLowerCase();
+      const symKey = document.getElementById(`symSelect_${idx}`).value;
+      if (!kw) return;
+
+      try {
+        const res = await fetch('/api/symbols/add-keyword', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol_key: symKey, keyword: kw })
+        });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.detail || 'Gagal menyimpan kata kunci');
+
+        symbolLibraryCache = result.symbols;
+        if (result.infra_aliases) infraAliasesCache = result.infra_aliases;
+
+        if (loadedKmlData) {
+          reclassifyLoadedKml();
+        }
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    function reclassifyLoadedKml() {
+      const candidates = [];
+      Object.entries(symbolLibraryCache).forEach(([symKey, cfg]) => {
+        (cfg.keywords || []).forEach(kw => {
+          const clean = kw.trim().toLowerCase();
+          if (clean) candidates.push({ len: clean.length, kw: clean, symKey });
+        });
+      });
+      candidates.sort((a, b) => b.len - a.len);
+
+      const c = { MANHOLE: 0, HANDHOLE: 0, CLOSURE: 0, ODP: 0, ODC: 0, SLACK: 0, TIANG: 0, SEGMEN_KABEL: loadedKmlData.paths.length, LAINNYA: 0 };
+
+      loadedKmlData.points.forEach(pt => {
+        const upper = pt.name.toUpperCase();
+        const lower = pt.name.toLowerCase();
+        let detected = 'DEFAULT';
+
+        if (upper.includes('MH') || (infraAliasesCache.MH || []).some(a => lower.includes(a.toLowerCase()))) detected = 'MH';
+        else if (upper.includes('HH') || (infraAliasesCache.HH || []).some(a => lower.includes(a.toLowerCase()))) detected = 'HH';
+        else if (upper.includes('HA') || (infraAliasesCache.HA || []).some(a => lower.includes(a.toLowerCase()))) detected = 'HA';
+        else if (upper.includes('HB') || (infraAliasesCache.HB || []).some(a => lower.includes(a.toLowerCase()))) detected = 'HB';
+        else {
+          const hit = candidates.find(item => lower.includes(item.kw));
+          if (hit) detected = hit.symKey;
+        }
+        pt.type = detected;
+
+        if (detected === 'MH') c.MANHOLE++;
+        else if (['HH', 'HA', 'HB'].includes(detected)) c.HANDHOLE++;
+        else if (['CLOSURE', 'JC'].includes(detected)) c.CLOSURE++;
+        else if (['ODP', 'ODPNEW'].includes(detected)) c.ODP++;
+        else if (detected === 'ODC') c.ODC++;
+        else if (detected === 'SLACK') c.SLACK++;
+        else if (['TN', 'TE'].includes(detected)) c.TIANG++;
+        else c.LAINNYA++;
+      });
+
+      loadedKmlData.summary.counts = c;
+      renderKmlOnMap(loadedKmlData);
+      populateAnalysisPanel(loadedKmlData);
+    }
+
+    function switchBaseLayer(mode) {
+      map.removeLayer(activeTile);
+      if (mode === 'OSM') activeTile = tileOsm.addTo(map);
+      else if (mode === 'SAT') activeTile = tileSat.addTo(map);
+      else activeTile = tileCad.addTo(map);
+
+      ['CAD', 'OSM', 'SAT'].forEach(m => {
+        const railBtn = document.getElementById('btnLayer' + m);
+        const pillBtn = document.getElementById('pill' + m);
+        if (m === mode) {
+          railBtn.className = 'w-10 h-10 rounded-xl bg-slate-800 text-blue-400 border border-blue-500/50 flex items-center justify-center text-base transition';
+          pillBtn.className = 'px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700';
+        } else {
+          railBtn.className = 'w-10 h-10 rounded-xl hover:bg-slate-800 text-slate-300 flex items-center justify-center text-base transition';
+          pillBtn.className = 'px-2.5 py-1 rounded-lg text-slate-600 hover:bg-slate-100';
+        }
+      });
+    }
+
+    function toggleLabels() {
+      labelsVisible = !labelsVisible;
+      const btn = document.getElementById('btnToggleLabels');
+      btn.classList.toggle('text-amber-400', labelsVisible);
+      btn.classList.toggle('text-slate-500', !labelsVisible);
+      if (loadedKmlData) renderKmlOnMap(loadedKmlData);
+    }
+
+    map.on('mousemove', (e) => {
+      document.getElementById('curLat').textContent = e.latlng.lat.toFixed(5);
+      document.getElementById('curLon').textContent = e.latlng.lng.toFixed(5);
+      document.getElementById('curZoom').textContent = map.getZoom();
+    });
+
+    function switchTab(tab) {
+      ['konversi', 'analisis', 'panduan'].forEach(t => {
+        document.getElementById('panel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('hidden', t !== tab);
+        const btn = document.getElementById('tabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (t === tab) {
+          btn.classList.add('border-slate-900', 'text-slate-900');
+          btn.classList.remove('border-transparent', 'text-slate-500');
+        } else {
+          btn.classList.remove('border-slate-900', 'text-slate-900');
+          btn.classList.add('border-transparent', 'text-slate-500');
+        }
+      });
+    }
+
+    function updatePrintPreview() {
+      const scale = document.getElementById('selectScale').value;
+      const txt = document.getElementById('selectTextSize').value;
+      document.getElementById('previewScaleText').textContent = scale;
+      document.getElementById('previewTitleScale').textContent = scale;
+
+      const sizeClass = txt === 'Besar' ? 'text-xs' : (txt === 'Kecil' ? 'text-[9px]' : 'text-[10px]');
+      document.getElementById('previewLabel1').className = `font-mono font-bold mt-1 ${sizeClass}`;
+      document.getElementById('previewLabel2').className = `font-mono mt-1 ${sizeClass}`;
+    }
+
+    function updateExportButtonLabel() {
+      const includeBoq = document.getElementById('chkIncludeBoq').checked;
+      const btn = document.getElementById('btnExportDxf');
+      btn.textContent = includeBoq ? '📥 Ekspor DXF + BOQ (.zip) →' : '📥 Ekspor File DXF (.dxf) →';
+    }
+
+    async function searchLocation() {
+      const q = document.getElementById('searchInput').value.trim();
+      if (!q) return;
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        map.setView([parseFloat(data[0].lat), parseFloat(data[0].lon)], 17);
+      } else {
+        alert('Lokasi tidak ditemukan.');
+      }
+    }
+
+    async function handleKmlUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/parse-kml', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Gagal memproses KML');
+
+        loadedKmlData = data;
+        renderKmlOnMap(data);
+        populateAnalysisPanel(data);
+
+        const cleanBase = data.filename.replace(/\.(kml|kmz)$/i, '').trim() || 'BOLERO_STUDIO';
+        document.getElementById('previewFilenameBox').textContent = `${cleanBase}.DXF`;
+
+        if (!drawerOpen) toggleDrawer();
+        switchTab('analisis');
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    function renderKmlOnMap(data) {
+      kmlLayerGroup.clearLayers();
+      const allCoords = [];
+
+      data.paths.forEach(path => {
+        L.polyline(path.coords, { color: path.map_color, weight: 3.5, opacity: 0.9 }).addTo(kmlLayerGroup);
+        path.coords.forEach(c => allCoords.push(c));
+      });
+
+      data.points.forEach(pt => {
+        allCoords.push([pt.lat, pt.lon]);
+        const symCfg = symbolLibraryCache[pt.type];
+        const fallbackMap = { MH: '#0284c7', HH: '#dc2626', HA: '#dc2626', HB: '#dc2626' };
+        const col = symCfg ? (symCfg.color_map || '#ef4444') : (fallbackMap[pt.type] || '#64748b');
+
+        const marker = L.circleMarker([pt.lat, pt.lon], {
+          radius: 5, fillColor: col, color: '#ffffff', weight: 1.5, fillOpacity: 1
+        }).addTo(kmlLayerGroup);
+
+        if (labelsVisible) {
+          marker.bindTooltip(pt.name, { permanent: true, direction: 'top', offset: [0, -5], className: 'fttx-label' });
+        }
+        marker.on('click', () => highlightPoint(pt));
+      });
+
+      if (allCoords.length > 0) {
+        map.fitBounds(L.latLngBounds(allCoords), { padding: [40, 40] });
+      }
+    }
+
+    function populateAnalysisPanel(data) {
+      document.getElementById('kmlFilenameLabel').textContent = data.filename;
+      document.getElementById('statTotalFitur').textContent = data.summary.total_fitur;
+      document.getElementById('statPanjangKm').innerHTML = `${data.summary.total_panjang_km.toFixed(2).replace('.', ',')} <span class="text-xs font-normal">km</span>`;
+
+      const c = data.summary.counts;
+      document.getElementById('cntMH').textContent = c.MANHOLE;
+      document.getElementById('cntHH').textContent = c.HANDHOLE;
+      document.getElementById('cntJC').textContent = c.CLOSURE;
+      document.getElementById('cntSlack').textContent = c.SLACK || 0;
+      document.getElementById('cntODP').textContent = c.ODP;
+      document.getElementById('cntODC').textContent = c.ODC;
+      document.getElementById('cntTiang').textContent = c.TIANG;
+      document.getElementById('cntKabel').textContent = c.SEGMEN_KABEL;
+      document.getElementById('cntLainnya').textContent = c.LAINNYA;
+
+      const badge = document.getElementById('statusBadge');
+      if (c.LAINNYA === 0 && data.points.length > 0) {
+        badge.className = 'p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium';
+        badge.textContent = '✅ Semua titik berhasil dikenali.';
+      } else {
+        badge.className = 'p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium';
+        badge.textContent = `⚠️ ${data.points.length - c.LAINNYA} titik dikenali, ${c.LAINNYA} kategori umum.`;
+      }
+
+      const listContainer = document.getElementById('pointsListContainer');
+      listContainer.innerHTML = '';
+      data.points.forEach((pt, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left px-3 py-1.5 hover:bg-blue-50 flex items-center justify-between transition';
+        btn.innerHTML = `<span class="font-mono truncate">${String(i + 1).padStart(2, '0')}. ${pt.name}</span><span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">${pt.type}</span>`;
+        btn.onclick = () => highlightPoint(pt);
+        listContainer.appendChild(btn);
+      });
+
+      renderUnrecognizedPoints(data);
+    }
+
+    function highlightPoint(pt) {
+      clearReviewHighlight();
+      map.setView([pt.lat, pt.lon], 19);
+      reviewCircle = L.circle([pt.lat, pt.lon], {
+        radius: 12, color: '#ef4444', weight: 3, fillOpacity: 0.08
+      }).addTo(map);
+      document.getElementById('reviewPointName').textContent = pt.name;
+      document.getElementById('reviewBanner').classList.remove('hidden');
+    }
+
+    function clearReviewHighlight() {
+      if (reviewCircle) {
+        map.removeLayer(reviewCircle);
+        reviewCircle = null;
+      }
+      document.getElementById('reviewBanner').classList.add('hidden');
+    }
+
+    async function exportDxf() {
+      const btn = document.getElementById('btnExportDxf');
+      const includeBoq = document.getElementById('chkIncludeBoq').checked;
+      btn.disabled = true;
+      btn.textContent = includeBoq ? '⏳ Memproses DXF & BOQ...' : '⏳ Memproses DXF...';
+
+      const b = map.getBounds();
+      const rawName = loadedKmlData ? loadedKmlData.filename : 'BOLERO_STUDIO_EXPORT.kml';
+      const baseName = rawName.replace(/\.(kml|kmz)$/i, '').replace(/[<>:"/\\|?*]/g, '_').trim() || 'BOLERO_STUDIO_EXPORT';
+
+      const payload = {
+        filename: rawName,
+        include_boq: includeBoq,
+        bounds: loadedKmlData ? loadedKmlData.bounds : {
+          north: b.getNorth(), south: b.getSouth(), east: b.getEast(), west: b.getWest()
+        },
+        scale: document.getElementById('selectScale').value,
+        text_size: document.getElementById('selectTextSize').value,
+        layers: {
+          jalan: document.getElementById('chkJalan').checked,
+          bangunan: document.getElementById('chkBangunan').checked,
+          air: document.getElementById('chkAir').checked,
+          teks: document.getElementById('chkTeks').checked
+        },
+        points: loadedKmlData ? loadedKmlData.points : [],
+        paths: loadedKmlData ? loadedKmlData.paths : []
+      };
+
+      try {
+        const res = await fetch('/api/export-dxf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Gagal membuat file DXF');
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = includeBoq ? `${baseName}.zip` : `${baseName}.dxf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        alert('Ekspor gagal: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        updateExportButtonLabel();
+      }
+    }
+  </script>
+</body>
+</html>
